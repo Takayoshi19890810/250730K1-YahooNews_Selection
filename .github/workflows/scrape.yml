@@ -16,38 +16,31 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: 必要なパッケージをインストール（Chrome関連含む）
+      - name: Chromeと依存パッケージのインストール
         run: |
           sudo apt-get update
           sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2t64 fonts-liberation libappindicator3-1 xdg-utils jq
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome*.deb || sudo apt -f install -y
 
-      - name: ChromeDriverをインストール
+      - name: ChromeDriverをインストール（Chromeとバージョン一致）
         run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
-          CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d '.' -f 1)
           wget -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip
           unzip chromedriver.zip
           sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
           sudo chmod +x /usr/local/bin/chromedriver
 
-      - name: requirements.txt から依存関係をインストール
+      - name: Pythonライブラリをインストール
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: サービスアカウントキーを作成 (Python経由)
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-        run: |
-          python -c "import base64; import os; f = open('service_account.json', 'wb'); f.write(base64.b64decode(os.environ['GCP_SA_KEY'])); f.close()"
+      - name: スクレイピングスクリプトを実行
+        run: python scrape_yahoo_news.py
 
-      - name: Pythonスクリプトを実行
-        run: python scrape_news_to_drive.py
-
-      - name: 実行結果をアーティファクトとしてアップロード（存在すれば）
+      - name: 結果Excelファイルをアーティファクトとしてアップロード
         uses: actions/upload-artifact@v4
         with:
-          name: scraped-news-xlsx
+          name: scraped-yahoo-news
           path: "*.xlsx"
