@@ -11,10 +11,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 # --- 設定 ---
 SPREADSHEET_ID = "1nphpu1q2cZuxJe-vYuOliw1azxqKKlzt6FFGNEJ76sw"
-INPUT_SHEET_NAME = "input"
+INPUT_SHEET_NAME = "Yahoo"  # ← 修正ポイント
 SERVICE_ACCOUNT_FILE = 'service_account.json'
 TODAY_STR = datetime.now().strftime("%y%m%d")
-
 
 def parse_relative_time(text):
     now = datetime.now()
@@ -36,10 +35,8 @@ def parse_relative_time(text):
         pass
     return now
 
-
 def format_datetime(dt):
     return dt.strftime("%y/%m/%d %H:%M")
-
 
 def get_news_content(driver, url):
     driver.get(url)
@@ -53,7 +50,6 @@ def get_news_content(driver, url):
         title = "タイトル取得失敗"
         content = ["本文取得失敗"]
     return title, content
-
 
 def get_comments(driver, url):
     article_id = url.rstrip("/").split("/")[-1]
@@ -85,7 +81,6 @@ def get_comments(driver, url):
         page += 1
     return comments if comments else [("コメントなし", "", "")]
 
-
 def main():
     # 認証とシート取得
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -98,11 +93,12 @@ def main():
     # 出力ブック作成
     wb = Workbook()
     ws_in = wb.active
-    ws_in.title = "input"
+    ws_in.title = "Yahoo"
     for r_idx, row in enumerate(rows, 1):
         for c_idx, val in enumerate(row, 1):
             ws_in.cell(row=r_idx, column=c_idx, value=val)
 
+    # ブラウザ設定
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -110,9 +106,9 @@ def main():
     driver = webdriver.Chrome(options=options)
 
     for idx, row in enumerate(rows[1:], 2):
-        if len(row) < 2 or not row[1].startswith("http"):
+        if len(row) < 3 or not row[2].startswith("http"):
             continue
-        url = row[1]
+        url = row[2]
         ws = wb.create_sheet(title=str(idx - 1))
         try:
             title, content = get_news_content(driver, url)
