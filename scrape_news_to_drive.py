@@ -143,8 +143,8 @@ def get_urls_from_google_sheet(spreadsheet_url):
 def upload_file_to_drive(file_path, drive_folder_id=None):
     try:
         gauth = GoogleAuth()
-        gauth.settings['client_config_file'] = SERVICE_ACCOUNT_FILE
-        gauth.ServiceAccountAuth()  # ← 修正済み
+        gauth.LoadServiceConfigFile(SERVICE_ACCOUNT_FILE)
+        gauth.Authorize()
 
         drive = GoogleDrive(gauth)
         file_name = os.path.basename(file_path)
