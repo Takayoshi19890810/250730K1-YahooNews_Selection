@@ -18,12 +18,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install selenium gspread oauth2client openpyxl beautifulsoup4
-
-      - name: Install Chrome and ChromeDriver
-        run: |
           sudo apt update
-          sudo apt install -y wget unzip xvfb libxi6 libgconf-2-4
+          sudo apt install -y wget unzip xvfb libxi6
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome*.deb || sudo apt -f install -y
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
@@ -31,17 +27,11 @@ jobs:
           unzip chromedriver.zip
           sudo mv chromedriver /usr/local/bin/
           sudo chmod +x /usr/local/bin/chromedriver
+          pip install -r requirements.txt
 
-      - name: List files before run
-        run: ls -al
-
-      - name: Run scrape script
-        run: python scrape_news_to_drive.py
+      - name: Run scraper
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: service_account.json
-
-      - name: Upload Excel output
-        uses: actions/upload-artifact@v4
-        with:
-          name: scraped-news
-          path: "*.xlsx"
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$GCP_SERVICE_ACCOUNT_KEY" > service_account.json
+          python scrape_news_to_drive.py
