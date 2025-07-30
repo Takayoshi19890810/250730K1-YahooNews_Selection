@@ -11,22 +11,22 @@ jobs:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
 
-      - name: Pythonをセットアップ
+      - name: Pythonをセットアップ（3.11を使用）
         uses: actions/setup-python@v5
         with:
-          python-version: 3.10
+          python-version: 3.11
 
-      - name: 必要パッケージをインストール
+      - name: 必要なパッケージをインストール
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2 fonts-liberation libappindicator3-1 xdg-utils
+          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2 fonts-liberation libappindicator3-1 xdg-utils jq
 
       - name: Google Chromeをインストール
         run: |
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome*.deb || sudo apt-get -f install -y
 
-      - name: ChromeDriverをインストール
+      - name: ChromeDriverをインストール（Chromeのバージョンに合わせて）
         run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
           CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d '.' -f 1)
@@ -40,8 +40,8 @@ jobs:
       - name: Pythonパッケージをインストール
         run: pip install -r requirements.txt
 
-      - name: 認証情報をJSONとして保存
+      - name: Googleサービスアカウントキーを保存
         run: echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' | jq '.' > service_account.json
 
-      - name: スクレイピングスクリプトを実行
+      - name: ニューススクレイピングスクリプトを実行
         run: python scrape_news_to_drive.py
