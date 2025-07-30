@@ -143,23 +143,22 @@ def get_urls_from_google_sheet(spreadsheet_url):
 def upload_file_to_drive(file_path, drive_folder_id=None):
     try:
         gauth = GoogleAuth()
-        gauth.LoadCredentialsFile(SERVICE_ACCOUNT_FILE)
-        if gauth.credentials is None:
-            gauth.ServiceAuth()
-        elif gauth.access_token_expired:
-            gauth.Refresh()
-        else:
-            gauth.Authorize()
+        gauth.settings['client_config_file'] = SERVICE_ACCOUNT_FILE
+        gauth.ServiceAuth()  # サービスアカウントで認証
+
         drive = GoogleDrive(gauth)
         file_name = os.path.basename(file_path)
+
         metadata = {'title': file_name}
         if drive_folder_id:
             metadata['parents'] = [{"kind": "drive#fileLink", "id": drive_folder_id}]
+
         f = drive.CreateFile(metadata)
         f.SetContentFile(file_path)
         f.Upload()
         print(f"✅ Google Driveにアップロード完了: {f['id']}")
         return f['id']
+
     except Exception as e:
         print(f"Driveアップロード失敗: {e}")
         return None
