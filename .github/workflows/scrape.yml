@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y wget unzip xvfb libxi6  # ← libgconf-2-4 は削除済み
+        sudo apt install -y wget unzip xvfb libxi6  # libgconf-2-4 削除
         pip install -r requirements.txt
 
     - name: Install Google Chrome
@@ -33,7 +33,6 @@ jobs:
         CHROME_MAJOR_VERSION=${CHROME_VERSION%%.*}
         echo "Detected Chrome major version: $CHROME_MAJOR_VERSION"
 
-        # 自動で最新対応版を取得するための工夫
         DRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" | \
                      jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
 
@@ -49,8 +48,8 @@ jobs:
         echo "${GCP_SERVICE_ACCOUNT_KEY}" > service_account.json
         python scrape_news_to_drive.py
 
-    - name: Upload Excel artifact (if exists)
-      uses: actions/upload-artifact@v3
+    - name: Upload Excel artifact
+      uses: actions/upload-artifact@v4
       with:
         name: news-excel
         path: "*.xlsx"
