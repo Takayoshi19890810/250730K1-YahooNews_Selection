@@ -1,41 +1,56 @@
-name: run-scraper
+name: scrape-and-upload
 
 on:
   workflow_dispatch:
 
 jobs:
-  scrape-and-upload:
+  run-scraper:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Checkout repo
       uses: actions/checkout@v3
-
-    - name: Install Chrome 114
-      run: |
-        sudo apt update
-        sudo apt install -y wget unzip xvfb libxi6 libgconf-2-4
-        wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.90-1_amd64.deb
-        sudo dpkg -i google-chrome-stable_114.0.5735.90-1_amd64.deb || sudo apt -f install -y
-
-    - name: Install Chromedriver 114
-      run: |
-        wget -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip
-        unzip chromedriver.zip
-        sudo mv chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.10
+        python-version: "3.10"
 
     - name: Install dependencies
       run: |
+        sudo apt update
+        sudo apt install -y wget unzip xvfb libxi6  # ← libgconf-2-4 は削除済み
         pip install -r requirements.txt
 
-    - name: Run Scraper
-      run: python scrape_news_to_drive.py
+    - name: Install Google Chrome
+      run: |
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt -f install -y
+
+    - name: Install ChromeDriver
+      run: |
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
+        CHROME_MAJOR_VERSION=${CHROME_VERSION%%.*}
+        echo "Detected Chrome major version: $CHROME_MAJOR_VERSION"
+
+        # 自動で最新対応版を取得するための工夫
+        DRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" | \
+                     jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
+
+        wget -O chromedriver.zip "$DRIVER_URL"
+        unzip chromedriver.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+
+    - name: Run scraper script
       env:
         GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      run: |
+        echo "${GCP_SERVICE_ACCOUNT_KEY}" > service_account.json
+        python scrape_news_to_drive.py
 
+    - name: Upload Excel artifact (if exists)
+      uses: actions/upload-artifact@v3
+      with:
+        name: news-excel
+        path: "*.xlsx"
