@@ -1,3 +1,6 @@
 selenium
 beautifulsoup4
 openpyxl
+gspread
+oauth2client # または google-auth-oauthlib
+PyDrive2
