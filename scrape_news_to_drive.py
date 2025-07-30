@@ -144,7 +144,7 @@ def upload_file_to_drive(file_path, drive_folder_id=None):
     try:
         gauth = GoogleAuth()
         gauth.settings['client_config_file'] = SERVICE_ACCOUNT_FILE
-        gauth.ServiceAuth()  # サービスアカウントで認証
+        gauth.ServiceAccountAuth()  # ← 修正済み
 
         drive = GoogleDrive(gauth)
         file_name = os.path.basename(file_path)
