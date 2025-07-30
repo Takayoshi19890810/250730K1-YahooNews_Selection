@@ -44,7 +44,7 @@ def parse_relative_time(text):
     # 絶対的な日付形式（例: '2023年7月29日'）も考慮
     try:
         # よくある日付形式のパターン
-        for fmt in ("%Y年%m月%d日 %H時%M分", "%Y/%m/%d %H:%M", "%y/%m/%d %H:%M", "%Y年%m月%d日", "%Y/%m/%d"):
+        for fmt in ("%Y年%m月%d日 %H時%M分", "%Y/%m/%d %H:%M", "%y/%m/%d %H:%M", "%Y年%m月%d日", "%Y/%m/%d", "%Y/%m/%d %H:%M:%S"): # ★追加
             if "時" not in text and "分" not in text and "日" in fmt: # 時間情報がない場合の考慮
                 return datetime.strptime(text.split(' ')[0], fmt).replace(hour=0, minute=0, second=0)
             else:
@@ -151,32 +151,33 @@ def get_urls_from_google_sheet(spreadsheet_url):
         # 全てのデータを取得
         rows = worksheet.get_all_values()
 
-        # ヘッダー行をスキップし、B列（投稿日、インデックス1）とC列（URL、インデックス2）を抽出
-        news_data = [] # (URL, 投稿日時datetimeオブジェクト, A列の値, B列の値) のリスト
+        # ヘッダー行をスキップし、C列（投稿日、インデックス2）とD列（URL、インデックス3）を抽出
+        news_data = [] # (URL, 投稿日時datetimeオブジェクト, A列の値, B列の値, C列の値) のリスト
         if len(rows) > 1: # ヘッダー行をスキップ
             for row_idx, row in enumerate(rows[1:], 2): # row_idxは1-basedで実際のシートの行番号
-                if len(row) > 2 and row[2].startswith("http"): # URLが3列目にあり、httpで始まることを確認
+                # C列が投稿日、D列がURL
+                if len(row) > 3 and row[3].startswith("http"): # URLが4列目（D列）にあり、httpで始まることを確認
                     try:
-                        post_date_str = row[1] # B列の値 (投稿日)
+                        post_date_str = row[2] # ★C列の値 (投稿日、インデックス2)
                         post_datetime = None
                         if post_date_str:
-                            # Google Sheetsの日時形式は様々なので、一般的な形式を試す
-                            # 実際のシートの形式に合わせて調整が必要な場合がある
-                            for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d"):
+                            # 投稿日の書式: YYYY/MM/DD HH:MM:SS
+                            try:
+                                post_datetime = datetime.strptime(post_date_str, "%Y/%m/%d %H:%M:%S")
+                            except ValueError:
+                                # もし秒までない場合も考慮
                                 try:
-                                    post_datetime = datetime.strptime(post_date_str, fmt)
-                                    break
+                                    post_datetime = datetime.strptime(post_date_str, "%Y/%m/%d %H:%M")
                                 except ValueError:
-                                    continue
-                            if post_datetime is None:
-                                print(f"警告: スプレッドシートの投稿日時形式を認識できませんでした (行 {row_idx}, 値: '{post_date_str}')。この行はスキップされます。")
-                                continue # パース失敗したらスキップ
+                                    print(f"警告: スプレッドシートの投稿日時形式を認識できませんでした (行 {row_idx}, 値: '{post_date_str}')。この行はスキップされます。")
+                                    continue # パース失敗したらスキップ
 
                         news_data.append({
-                            'url': row[2],
+                            'url': row[3], # ★D列の値 (URL、インデックス3)
                             'post_datetime': post_datetime,
                             'original_A_col': row[0] if len(row) > 0 else '',
                             'original_B_col': row[1] if len(row) > 1 else '',
+                            'original_C_col': row[2] if len(row) > 2 else '', # ★C列の値も保持
                             'original_row_index': row_idx # 後でコメント数を書き込むための元の行番号
                         })
                     except Exception as e:
@@ -231,6 +232,7 @@ def main():
         return
 
     # 日付フィルタリングロジック: 前日15:00から当日14:59の範囲
+    # 現在時刻はJST 11:25:55 なので、今日の日付は 2025/07/30
     now_jst = datetime.now() # GitHub ActionsはUTCだが、ここでは実行時のタイムゾーンをJSTと仮定して処理
     # 実行日の前日15:00 (JST)
     start_time = (now_jst - timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
@@ -272,15 +274,9 @@ def main():
             ws_input.cell(row=r_idx, column=c_idx, value=val)
 
     # 'input' シートのヘッダーに「コメント件数」列を追加 (F列)
-    if len(all_sheet_rows) > 0:
-        ws_input.cell(row=1, column=6, value="コメント件数")
-    else: # スプレッドシートが空の場合の対応
-        ws_input.cell(row=1, column=1, value="A列")
-        ws_input.cell(row=1, column=2, value="B列")
-        ws_input.cell(row=1, column=3, value="C列")
-        ws_input.cell(row=1, column=4, value="D列")
-        ws_input.cell(row=1, column=5, value="E列")
-        ws_input.cell(row=1, column=6, value="コメント件数")
+    # スプレッドシートの列数に応じて調整が必要（A=1, B=2, C=3, D=4, E=5, F=6）
+    comment_count_col = max(len(all_sheet_rows[0]) if all_sheet_rows else 0, 5) + 1 # 既存列+1 (最低F列)
+    ws_input.cell(row=1, column=comment_count_col, value="コメント件数")
 
 
     # フィルタリングされたニュースを順次処理
@@ -294,9 +290,11 @@ def main():
         # 最大31文字制限、特殊文字は避ける
         sheet_title_base = f"News_{idx}"
         if news_item['original_A_col']:
-             sheet_title_base = f"{news_item['original_A_col']}_{idx}"
-        sheet_title = "".join(c for c in sheet_title_base if c.isalnum() or c in ('_', '-'))[:31]
-        
+             # A列の値をシート名に含める場合、文字数と特殊文字に注意
+             clean_a_col = "".join(c for c in news_item['original_A_col'] if c.isalnum() or c in ('_', '-'))
+             sheet_title_base = f"{clean_a_col[:20]}_{idx}" # A列の先頭20文字とインデックス
+        sheet_title = sheet_title_base[:31] # 最終的なシート名は31文字以内
+
         # シート名が重複しないように調整
         counter = 0
         final_sheet_title = sheet_title
@@ -342,13 +340,13 @@ def main():
 
             # コメント件数を計算して 'input' シートに書き込む
             comment_count = len(comments) if comments[0][0] != "コメントなし" else 0
-            ws_input.cell(row=original_row_index, column=6, value=comment_count)
+            ws_input.cell(row=original_row_index, column=comment_count_col, value=comment_count)
 
         except Exception as e:
             ws.cell(row=20, column=1, value="コメント取得失敗")
             ws.cell(row=20, column=2, value=str(e))
             print(f"コメント取得エラー ({url}): {e}")
-            ws_input.cell(row=original_row_index, column=6, value="取得失敗")
+            ws_input.cell(row=original_row_index, column=comment_count_col, value="取得失敗")
 
     driver.quit() # ブラウザを閉じる
     wb.save(OUTPUT_FILE) # ローカルに一時保存
