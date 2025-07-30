@@ -37,8 +37,11 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: サービスアカウントキーを作成
-        run: echo "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" > service_account.json
+      - name: サービスアカウントキーを作成 (Python経由)
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+        run: |
+          python -c "import base64; import os; f = open('service_account.json', 'wb'); f.write(base64.b64decode(os.environ['GCP_SA_KEY'])); f.close()"
 
       - name: Pythonスクリプトを実行
         run: python scrape_news_to_drive.py
