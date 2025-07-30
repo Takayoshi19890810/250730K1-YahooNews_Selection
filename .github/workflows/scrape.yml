@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Chromeと依存パッケージのインストール
+      - name: Chromeと必要パッケージのインストール
         run: |
           sudo apt-get update
           sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2t64 fonts-liberation libappindicator3-1 xdg-utils jq
@@ -36,10 +36,16 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: スクレイピングスクリプトを実行
-        run: python scrape_yahoo_news.py
+      - name: サービスアカウントキーを生成（Secretsから）
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$GCP_SA_KEY" | base64 -d > service_account.json
 
-      - name: 結果Excelファイルをアーティファクトとしてアップロード
+      - name: Pythonスクリプトを実行
+        run: python scrape_news_to_drive.py
+
+      - name: 結果ファイルをアーティファクトとしてアップロード
         uses: actions/upload-artifact@v4
         with:
           name: scraped-yahoo-news
