@@ -113,10 +113,18 @@ def get_urls_from_google_sheet(spreadsheet_url):
                     post_date_str = row[2] if len(row) > 2 else ""
                     post_datetime = None
                     if post_date_str:
-                        try:
-                            post_datetime = datetime.strptime(post_date_str, "%Y/%m/%d %H:%M:%S")
-                        except ValueError:
-                            post_datetime = datetime.strptime(post_date_str, "%Y/%m/%d %H:%M")
+                        date_formats = ["%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%m/%d %H:%M"]
+                        for fmt in date_formats:
+                            try:
+                                dt = datetime.strptime(post_date_str, fmt)
+                                if fmt == "%m/%d %H:%M":
+                                    dt = dt.replace(year=datetime.now().year)
+                                post_datetime = dt
+                                break
+                            except ValueError:
+                                continue
+                        if post_datetime is None:
+                            raise ValueError(f"Unsupported date format: {post_date_str}")
                     news_data.append({
                         'url': row[1],
                         'post_datetime': post_datetime,
