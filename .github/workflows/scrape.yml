@@ -1,47 +1,50 @@
-name: run-scraper
+name: scrape-and-upload
 
 on:
   workflow_dispatch:
 
 jobs:
-  scrape-and-upload:
+  run-scraper:
     runs-on: ubuntu-latest
 
     steps:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
 
-      - name: Pythonをセットアップ（3.11を使用）
+      - name: Pythonをセットアップ
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
 
-      - name: 必要なパッケージをインストール
+      - name: 必要なパッケージをインストール（Chrome関連含む）
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2 fonts-liberation libappindicator3-1 xdg-utils jq
-
-      - name: Google Chromeをインストール
-        run: |
+          sudo apt-get install -y wget unzip xvfb libxi6 libnss3 libxss1 libasound2t64 fonts-liberation libappindicator3-1 xdg-utils jq
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome*.deb || sudo apt-get -f install -y
+          sudo dpkg -i google-chrome*.deb || sudo apt -f install -y
 
-      - name: ChromeDriverをインストール（Chromeのバージョンに合わせて）
+      - name: ChromeDriverをインストール
         run: |
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
-          CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d '.' -f 1)
-          DRIVER_URL=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json \
-            | jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
-          wget -O chromedriver.zip "$DRIVER_URL"
+          CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d '.' -f 1)
+          wget -O chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION/linux64/chromedriver-linux64.zip
           unzip chromedriver.zip
-          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
           sudo chmod +x /usr/local/bin/chromedriver
 
-      - name: Pythonパッケージをインストール
-        run: pip install -r requirements.txt
+      - name: requirements.txt から依存関係をインストール
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Googleサービスアカウントキーを保存
-        run: echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' | jq '.' > service_account.json
+      - name: サービスアカウントキーを作成
+        run: echo "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}" > service_account.json
 
-      - name: ニューススクレイピングスクリプトを実行
+      - name: Pythonスクリプトを実行
         run: python scrape_news_to_drive.py
+
+      - name: 実行結果をアーティファクトとしてアップロード（存在すれば）
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-news-xlsx
+          path: "*.xlsx"
