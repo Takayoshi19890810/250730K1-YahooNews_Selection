@@ -1,0 +1,59 @@
+name: Daily News Scraper to Google Drive
+
+on:
+  workflow_dispatch: # 手動でワークフローを実行できるようにする
+  schedule:
+    # 毎日JST 15:15 に実行 (UTC 06:15)
+    # GitHub ActionsのスケジューラはUTCに基づいています (JST = UTC + 9時間)
+    - cron: '15 6 * * *'
+
+jobs:
+  scrape-and-upload:
+    runs-on: ubuntu-latest # Ubuntu環境で実行
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4 # リポジトリをチェックアウト
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9' # プログラムが動作するPythonのバージョンを指定 (例: '3.9', '3.10', '3.11')
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt # requirements.txt に記載されたライブラリをインストール
+
+    - name: Install Chrome and ChromeDriver
+      run: |
+        sudo apt-get update # パッケージリストを更新
+        sudo apt-get install -y google-chrome-stable # Google Chromeをインストール
+        
+        # ChromeDriverのインストール (Chromeのバージョンに合わせる必要があります)
+        # GitHub Actionsの環境で利用可能なChromeのバージョンを確認し、対応するChromeDriverをダウンロードしてください。
+        # 最新版のChromeDriverは以下で確認できます: https://googlechromelabs.github.io/chrome-for-testing/
+        # 例: Chrome 126の場合のChromeDriverダウンロードURL
+        wget -N https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/126.0.6478.126/linux64/chromedriver-linux64.zip
+        unzip chromedriver-linux64.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/ # ChromeDriverを実行可能なパスに移動
+        sudo chmod +x /usr/local/bin/chromedriver # 実行権限を付与
+
+    - name: Create Google Service Account Key File
+      env:
+        GCP_SA_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }} # GitHub Secretsからサービスアカウントキーを取得
+      run: |
+        # シークレットの内容をファイルに書き込む
+        echo "${GCP_SA_KEY}" > service_account.json
+        chmod 600 service_account.json # ファイルのパーミッションを設定（セキュリティのため）
+
+    - name: Run the Python script
+      run: python scrape_news_to_drive.py # 実際のスクリプトファイル名に置き換える
+
+    # デバッグ目的で、生成されたExcelファイルをGitHub Actionsの成果物としてアップロードする場合
+    - name: Upload local output Excel file (for debugging)
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-scraped-data-{{github.run_id}}
+        path: "*.xlsx" # 生成されたExcelファイル (例: 240730.xlsx) をアップロード
+        retention-days: 1 # 成果物の保存期間 (日数)
